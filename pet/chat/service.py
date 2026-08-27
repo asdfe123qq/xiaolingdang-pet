@@ -1,8 +1,14 @@
 from __future__ import annotations
-import threading, uuid
+import queue
+import threading
+import uuid
+
 from PySide6.QtCore import QObject, QThread, Signal
+
 from .models import ProviderConfig
 from .providers import OpenAICompatibleProvider
+
+CLOUD_RACE_SECONDS = 2.5
 
 
 class _Worker(QThread):
@@ -23,42 +29,71 @@ class _Worker(QThread):
         self.parts = []
 
     def run(self):
-        # 1) 先云端
+        if self.local_provider is not None and self.local_config is not None:
+            self._run_parallel()
+        else:
+            self._stream(self.provider, self.config)
+
+    def _emit_delta(self, text):
+        if self.cancel.is_set():
+            self.stopped_by_user.emit()
+            return False
+        self.parts.append(text)
+        self.delta_received.emit(text)
+        return True
+
+    def _stream(self, provider, config):
+        """只用一个 provider 流式输出。"""
         try:
-            for text in self.provider.stream(self.messages, self.config, self.cancel):
-                if self.cancel.is_set():
-                    self.stopped_by_user.emit()
+            for text in provider.stream(self.messages, config, self.cancel):
+                if not self._emit_delta(text):
                     return
-                self.parts.append(text)
-                self.delta_received.emit(text)
             if self.cancel.is_set():
                 self.stopped_by_user.emit()
             else:
                 self.completed.emit(''.join(self.parts))
-            return
         except Exception as exc:
             if self.cancel.is_set():
                 self.stopped_by_user.emit()
-                return
-            # 2) 云端失败/超时，本地 Ollama 兜底
-            if self.local_provider is not None and self.local_config is not None:
-                self.parts.clear()
-                try:
-                    for text in self.local_provider.stream(self.messages, self.local_config, self.cancel):
-                        if self.cancel.is_set():
-                            self.stopped_by_user.emit()
-                            return
-                        self.parts.append(text)
-                        self.delta_received.emit(text)
+            else:
+                self.failed.emit(str(exc))
+
+    def _run_parallel(self):
+        """云端和本地同时开始，云端先出第一个字就用云端，否则切本地。"""
+        cloud_q: "queue.Queue[str | None]" = queue.Queue()
+        cloud_first = threading.Event()
+
+        def cloud_call():
+            try:
+                for text in self.provider.stream(self.messages, self.config, self.cancel):
                     if self.cancel.is_set():
-                        self.stopped_by_user.emit()
-                    else:
-                        self.completed.emit(''.join(self.parts))
+                        return
+                    cloud_q.put(text)
+                    cloud_first.set()
+            except Exception:
+                pass
+            finally:
+                cloud_q.put(None)
+
+        t = threading.Thread(target=cloud_call, daemon=True)
+        t.start()
+        cloud_first.wait(CLOUD_RACE_SECONDS)
+
+        if cloud_first.is_set():
+            # 云端先到：用云端（真人感最好）
+            while True:
+                item = cloud_q.get()
+                if item is None:
+                    break
+                if not self._emit_delta(item):
                     return
-                except Exception as exc2:
-                    self.failed.emit(str(exc2))
-                    return
-            self.failed.emit(str(exc))
+            if self.cancel.is_set():
+                self.stopped_by_user.emit()
+            else:
+                self.completed.emit(''.join(self.parts))
+        else:
+            # 云端慢：用本地 Ollama（利用本机 GPU）
+            self._stream(self.local_provider, self.local_config)
 
 
 class ChatService(QObject):

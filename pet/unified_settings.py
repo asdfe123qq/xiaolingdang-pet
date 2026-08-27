@@ -27,7 +27,7 @@ VOICE_OPTIONS = [
     "zh-CN-shaanxi-XiaoniNeural",
 ]
 
-EMOTION_KEYS = ["开心", "生气", "惊讶", "害羞", "难过", "思考", "平静"]
+EMOTION_KEYS = ["开心", "生气", "惊讶", "害羞", "难过", "思考", "平静", "困", "惊喜", "傲娇"]
 
 
 def _categorized_anims() -> dict[str, list[str]]:

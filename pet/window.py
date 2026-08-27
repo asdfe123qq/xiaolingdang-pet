@@ -872,6 +872,9 @@ class PetWindow(QWidget):
                 '难过': '哈欠连天',
                 '思考': '深度思考碎碎念',
                 '平静': '待机呼吸休闲',
+                '困': '哈欠连天',
+                '惊喜': '点击回应-元气挥手',
+                '傲娇': '点击回应-傲娇生气',
             }.get(emotion)
             self._play_chat_anim(anim)
 
@@ -893,6 +896,10 @@ class PetWindow(QWidget):
             return "难过"
         if any(w in text for w in ("害羞", "不好意思", "脸红")):
             return "害羞"
+        if any(w in text for w in ("困", "想睡", "好累", "睡觉", "哈欠")):
+            return "困"
+        if any(w in text for w in ("惊喜", "没想到", "太意外")):
+            return "惊喜"
         return ""
 
     def _play_chat_anim(self, name: str) -> None:
