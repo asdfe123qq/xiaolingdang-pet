@@ -124,6 +124,13 @@ class UnifiedSettingsDialog(QDialog):
         form.addRow("Max Tokens", self.ai_tokens)
         form.addRow(self.ai_ssl)
 
+        # 本地兜底模型（云端失败/断网时自动切本地，需装 Ollama）
+        form.addRow(QLabel("—— 本地兜底（云端失败/断网自动切，需装 Ollama）——"))
+        self.local_url = QLineEdit(str(self.config.get("local_base_url", "http://127.0.0.1:11434/v1")))
+        self.local_model = QLineEdit(str(self.config.get("local_model", "qwen2.5:7b")))
+        form.addRow("本地地址", self.local_url)
+        form.addRow("本地模型", self.local_model)
+
         self.ai_result = QLabel("")
         self.ai_result.setWordWrap(True)
         self.ai_test = QPushButton("测试连接")
@@ -223,6 +230,9 @@ class UnifiedSettingsDialog(QDialog):
                 p.api_key = key
         self.settings.default_system_prompt = self.ai_prompt.toPlainText().strip()
         self.config.set_chat_settings(self.settings)
+        # 本地兜底模型
+        self.config.set("local_base_url", self.local_url.text().strip())
+        self.config.set("local_model", self.local_model.text().strip())
         # 语音
         self.config.set("tts", {
             "voice": self.tts_voice.currentText().strip(),

@@ -158,6 +158,9 @@ class Config:
             "drag_physics": False,
             "tts": dict(DEFAULT_TTS),
             "emotion_anims": dict(DEFAULT_EMOTION_ANIMS),
+            # 本地兜底模型（可自行改成更好的模型，如 qwen2.5:14b / qwen2.5:32b）
+            "local_base_url": "http://127.0.0.1:11434/v1",
+            "local_model": "qwen2.5:7b",
             "chat": _default_chat_data(),
         }
         self._load()
@@ -214,6 +217,7 @@ class Config:
             "playback_speed", "animation_gap_seconds", "self_talk_enabled",
             "self_talk_min_interval", "self_talk_max_interval", "self_talk_texts",
             "mouse_through", "drag_physics",
+            "local_base_url", "local_model",
         ):
             if key in raw and raw[key] is not None:
                 self.data[key] = raw[key]
