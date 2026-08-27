@@ -57,7 +57,7 @@ def _default_chat_data():
                 "model": "qwen3.8-27b",
                 "api_key_ref": "provider/xiaolingdang",
                 "api_key": "",
-                "timeout": 60.0,
+                "timeout": 15.0,
                 "temperature": 0.85,
                 "max_tokens": 400,
                 "verify_ssl": True,

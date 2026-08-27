@@ -264,7 +264,17 @@ class ChatWindow(QDialog):
         self.prompt_builder = PromptBuilder(Path(__file__).resolve().parents[2] / "assets" / "characters")
         self.store = SessionStore(config.dir)
         self.session = self._get_session()
-        self.service = ChatService(parent=self)
+        # 本地 Ollama 兜底：云端慢/断网时自动切本地（利用本机 GPU + 7B 模型）
+        from .models import ProviderConfig
+        from .providers import OpenAICompatibleProvider
+        local_provider = OpenAICompatibleProvider()
+        local_config = ProviderConfig(
+            'local', name='本地Ollama',
+            base_url=config.get('local_base_url', 'http://127.0.0.1:11434/v1'),
+            model=config.get('local_model', 'qwen2.5:7b'),
+            api_key='local', timeout=60.0, temperature=0.85, max_tokens=400,
+        )
+        self.service = ChatService(local_provider=local_provider, local_config=local_config, parent=self)
         self.pet_link = PetChatLink(pet_window)
         self._bubble: MessageBubble | None = None
         self._bubbles: list[MessageBubble] = []
