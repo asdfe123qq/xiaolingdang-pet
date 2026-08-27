@@ -2,6 +2,10 @@
 
 一个 Windows 桌面宠物：透明置顶、可拖动、能聊天、会说话、有情绪表情。基于开源项目 [dsh-pet-indesktop](https://github.com/MerZlin/dsh-pet-indesktop) 二次开发，接入了「小铃铛」AI 人格与情绪表情、口型同步、统一设置界面。
 
+## 截图
+
+![桌宠截图](docs/screenshot.png)
+
 ## 特性
 
 - 🐳 透明置顶桌宠，可拖动、可缩放、鼠标穿透
