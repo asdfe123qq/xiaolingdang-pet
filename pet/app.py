@@ -72,6 +72,7 @@ class PetApp:
         self.chat_window = None
         self.chat_settings_dialog = None
         self.pet_settings_dialog = None
+        self.voice_settings_dialog = None
 
     # ------------------------------------------------------------ 启动
     def start(self) -> None:
@@ -91,6 +92,7 @@ class PetApp:
         win.on_open_chat = self.open_chat if self.enable_chat else None
         win.on_open_chat_settings = self.open_chat_settings if self.enable_chat else None
         win.on_open_settings = self.open_pet_settings
+        win.on_open_unified_settings = self.open_unified_settings
         win.show()
 
         tray = self._build_tray(win)
@@ -138,6 +140,7 @@ class PetApp:
         win.on_open_chat = self.open_chat if self.enable_chat else None
         win.on_open_chat_settings = self.open_chat_settings if self.enable_chat else None
         win.on_open_settings = self.open_pet_settings
+        win.on_open_unified_settings = self.open_unified_settings
         win.show()
 
         tray = self._build_tray(win)
@@ -228,6 +231,23 @@ class PetApp:
         if result and self.win is not None:
             self.win.refresh_pet_settings()
 
+    def open_unified_settings(self) -> None:
+        """统一设置：AI / 语音 / 情绪映射 都在一个窗口。"""
+        from .unified_settings import UnifiedSettingsDialog
+        if self.voice_settings_dialog is None:
+            dialog = UnifiedSettingsDialog(self.config)
+            dialog.setModal(False)
+            dialog.setWindowModality(Qt.WindowModality.NonModal)
+            dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+            dialog.finished.connect(self._voice_settings_finished)
+            self.voice_settings_dialog = dialog
+        self._present_dialog(self.voice_settings_dialog)
+
+    def _voice_settings_finished(self, result: int) -> None:
+        self.voice_settings_dialog = None
+        if result and self.chat_window is not None:
+            self.chat_window.refresh_settings()
+
     def _build_tray(self, win: PetWindow) -> QSystemTrayIcon:
         tray = QSystemTrayIcon(QIcon(win.icon_pixmap()))
 
@@ -241,7 +261,7 @@ class PetApp:
         menu.addAction('显示 / 隐藏', toggle_visible)
         if self.enable_chat:
             menu.addAction('AI 对话', self.open_chat)
-            menu.addAction('AI 设置', self.open_chat_settings)
+        menu.addAction('设置', self.open_unified_settings)
         menu.addAction('桌宠设置', self.open_pet_settings)
 
         m_char = menu.addMenu('切换角色')

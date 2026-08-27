@@ -34,3 +34,10 @@ packaging/build_variant.py
 
 # 本地实验目录（含嵌套 git 仓库，不入库）
 .research/
+
+# 本项目追加
+.venv/
+*.log
+open_settings_preview.py
+pet_stdout.log
+pet_stderr.log

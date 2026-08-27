@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 import math
 import random
+import re
 import sys
 import time
 
@@ -114,6 +115,7 @@ class PetWindow(QWidget):
         self.on_open_chat = None
         self.on_open_chat_settings = None
         self.on_open_settings = None
+        self.on_open_unified_settings = None
         self._position_listeners = []
 
         # 根据当前形象实际拥有的动画动态计算分类，支持不同角色动作不一致
@@ -136,6 +138,7 @@ class PetWindow(QWidget):
         self.drag_physics: bool = bool(config.get('drag_physics', False))
         self.animation_gap_seconds: float = max(0.0, min(3600.0, float(config.get('animation_gap_seconds', 0.0))))
         self._animation_gap_active = False
+        self._talking = False
         self._animation_gap_timer = QTimer(self)
         self._animation_gap_timer.setSingleShot(True)
         self._animation_gap_timer.timeout.connect(self._on_animation_gap_timeout)
@@ -344,10 +347,12 @@ class PetWindow(QWidget):
     # ================================================================ 播放
     def _switch(self, name: str) -> None:
         """切换到指定动画（链式模型：全部一次性播放）。"""
+        print(f"[pet-debug] _switch -> {name!r}", flush=True)
         self._cancel_move()
         self.anim = name
         movie = self.lib.movie(name)
         self.movie = movie
+        self._ended_fired = True  # 防止 movie.stop() 触发 finished 被误判成"已播完"
         movie.stop()
         movie.jumpToFrame(0)
         if hasattr(movie, 'set_playback_speed'):
@@ -457,6 +462,11 @@ class PetWindow(QWidget):
 
     # ================================================================ 动画链
     def _on_anim_ended(self, name: str) -> None:
+        print(f"[pet-debug] _on_anim_ended name={name!r} talking={self._talking}", flush=True)
+        if self._talking:
+            # 说话中：循环当前动画（情绪表情持续到语音结束）
+            self._switch(self.anim)
+            return
         if name == self.drag and self._dragging:
             self.movie.jumpToFrame(0)
             self._ended_fired = False
@@ -706,11 +716,11 @@ class PetWindow(QWidget):
         menu = QMenu(self)
         if self.on_open_chat is not None:
             menu.addAction('AI 对话', self.on_open_chat)
-        if self.on_open_chat_settings is not None:
-            menu.addAction('AI 设置', self.on_open_chat_settings)
+        if self.on_open_unified_settings is not None:
+            menu.addAction('设置', self.on_open_unified_settings)
         if self.on_open_settings is not None:
             menu.addAction('桌宠设置', self.on_open_settings)
-        if self.on_open_chat is not None or self.on_open_chat_settings is not None or self.on_open_settings is not None:
+        if self.on_open_chat is not None or self.on_open_unified_settings is not None or self.on_open_settings is not None:
             menu.addSeparator()
 
         if self.idles:
@@ -840,9 +850,79 @@ class PetWindow(QWidget):
         self._schedule_self_talk()
 
     def set_chat_status(self, state: str, text: str = '') -> None:
+        print(f"[pet-debug] set_chat_status state={state!r} text={text[:50]!r}", flush=True)
         if not text:
             return
-        self._speech_bubble.show_text(text, self.visible_content_rect(), duration_ms=2200)
+        # 去掉情绪标签再显示气泡，避免把 <情绪> 显示给用户看
+        display = re.sub(r'<[^>]{1,6}>', '', text).strip()
+        if display:
+            # 字幕按文本长度显示，偏长一点确保和语音一起结束
+            hold_ms = max(4000, int(len(display) * 300) + 2000)
+            self._speech_bubble.show_text(display, self.visible_content_rect(), duration_ms=hold_ms)
+        # 情绪 / 思考 → 动画映射
+        if state == 'thinking':
+            self._play_chat_anim('深度思考碎碎念')
+            return
+        emotion = self._extract_emotion(text) or self._guess_emotion(display)
+        if emotion:
+            # 情绪 -> 动画 映射可从配置读取，未配置的回退到默认
+            anim_map = self.cfg.get('emotion_anims', {}) or {}
+            anim = anim_map.get(emotion) or {
+                '开心': '点击回应-开心跃动',
+                '生气': '点击回应-傲娇生气',
+                '惊讶': '被吓一跳',
+                '害羞': '点击回应-害羞惊讶',
+                '难过': '哈欠连天',
+                '思考': '深度思考碎碎念',
+                '平静': '待机呼吸休闲',
+            }.get(emotion)
+            print(f"[pet-debug] 情绪={emotion} 动画={anim}", flush=True)
+            self._play_chat_anim(anim)
+
+    def _extract_emotion(self, text: str) -> str:
+        m = re.search(r'<([^>]{1,6})>', text)
+        return m.group(1).strip() if m else ''
+
+    def _guess_emotion(self, text: str) -> str:
+        """AI 没输出情绪标签时，按关键词本地兜底判断（尽量精确，避免语气词误判）。"""
+        if not text:
+            return ''
+        if any(w in text for w in ("哈哈", "嘿嘿", "嘻嘻", "开心", "笑", "喜欢", "爱", "太好了", "棒", "可爱")):
+            return "开心"
+        if any(w in text for w in ("哼", "讨厌", "烦", "气死", "无语", "生气")):
+            return "生气"
+        if any(w in text for w in ("哇", "天哪", "居然", "吓一跳", "震惊", "惊讶")):
+            return "惊讶"
+        if any(w in text for w in ("难过", "伤心", "委屈", "哭")):
+            return "难过"
+        if any(w in text for w in ("害羞", "不好意思", "脸红")):
+            return "害羞"
+        return ""
+
+    def _play_chat_anim(self, name: str) -> None:
+        if not name:
+            return
+        try:
+            self._switch(name)
+        except Exception as exc:
+            print(f"[pet-debug] _switch 失败 name={name!r}: {exc}", flush=True)
+
+    def start_talking(self) -> None:
+        """开始说话：保持情绪表情循环；若当前是待机(无情绪)则切碎碎念兜底。"""
+        print("[pet-debug] start_talking 被调用", flush=True)
+        self._talking = True
+        if self.anim in self.idles:
+            self._play_chat_anim('深度思考碎碎念')
+
+    def stop_talking(self) -> None:
+        """说话结束，回待机。"""
+        print("[pet-debug] stop_talking 被调用", flush=True)
+        self._talking = False
+        if self.idles:
+            try:
+                self._switch(self._pick(self.idles))
+            except Exception:
+                pass
     def _request_switch_character(self, character_id: str) -> None:
         """请求切换角色；优先交给 app 做热切换，否则只保存配置。"""
         if self.on_switch_character is not None:

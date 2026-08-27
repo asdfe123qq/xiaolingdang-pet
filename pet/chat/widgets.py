@@ -837,16 +837,44 @@ class ChatWindow(QDialog):
         if self._active_request_id and request_id != self._active_request_id:
             return
         follow_output = self._is_near_bottom()
+        # 解析情绪标签，去掉后显示纯文本
+        import re as _re
+        clean = _re.sub(r'<[^>]{1,6}>', '', text).strip()
         if self._bubble:
-            self._bubble.set_content(text)
+            self._bubble.set_content(clean)
             self._bubble.set_state("normal")
-        self.session.messages.append(ChatMessage("assistant", text))
+        self.session.messages.append(ChatMessage("assistant", clean))
         self.store.save(self.session)
         self._refresh_sessions()
         self._reset()
         self.pet_link.success()
+        # 延迟 1.5 秒再开始语音+口型，让情绪表情先展示一下
+        QTimer.singleShot(1500, lambda: self._speak(clean))
         if follow_output:
             self._bottom()
+
+    def _speak(self, text: str) -> None:
+        if not text:
+            return
+        try:
+            from .speech import SpeechPlayer
+            if not hasattr(self, '_speech'):
+                self._speech = SpeechPlayer(tts=self.config.get('tts'))
+                self._speech.started.connect(self._on_speech_started)
+                self._speech.finished.connect(self._on_speech_finished)
+            self._speech.speak(text)
+        except Exception:
+            pass
+
+    def _on_speech_started(self) -> None:
+        pet = self.pet_link.pet_window
+        if pet and hasattr(pet, 'start_talking'):
+            pet.start_talking()
+
+    def _on_speech_finished(self) -> None:
+        pet = self.pet_link.pet_window
+        if pet and hasattr(pet, 'stop_talking'):
+            pet.stop_talking()
 
     def _error(self, request_id: str, text: str) -> None:
         if self._active_request_id and request_id != self._active_request_id:

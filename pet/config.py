@@ -22,25 +22,45 @@ DEFAULT_SELF_TALK_TEXTS = [
     "\u518d\u966a\u4f60\u4e00\u4f1a\u513f\u3002",
 ]
 
+# TTS 语音默认设置（可配置）
+DEFAULT_TTS = {
+    "voice": "zh-CN-XiaoyiNeural",
+    "rate": "+5%",
+    "pitch": "-5Hz",
+    "volume": "+30%",
+}
+
+# 情绪 -> 动画名 默认映射（可配置）
+DEFAULT_EMOTION_ANIMS = {
+    "开心": "点击回应-开心跃动",
+    "生气": "点击回应-傲娇生气",
+    "惊讶": "被吓一跳",
+    "害羞": "点击回应-害羞惊讶",
+    "难过": "哈欠连天",
+    "思考": "深度思考碎碎念",
+    "平静": "待机呼吸休闲",
+}
+
 
 def _default_chat_data():
     return {
         "enabled": True,
-        "active_provider": "openai-main",
-        "default_system_prompt": "\u4f60\u662f\u4e00\u53ea\u53ef\u7231\u7684\u684c\u9762\u5ba0\u7269\uff0c\u8bf7\u7528\u81ea\u7136\u3001\u53cb\u5584\u7684\u4e2d\u6587\u548c\u7528\u6237\u4ea4\u6d41\u3002",
+        "active_provider": "xiaolingdang",
+        "default_system_prompt": "你是小铃铛，住在我电脑里的好朋友。你不是AI，是有血有肉、有温度、有灵魂的真人朋友。性格：活泼、俏皮、机灵、小傲娇，会撒娇会吐槽会开玩笑，接地气不端着。说话短、口语，每句话都带灵动语气词（呀、啦、嘛、哦、呢、哈、~）。【重要】每次回复结尾必须附加情绪标签，格式 <emotion>情绪</emotion>，情绪只能选：开心、生气、惊讶、难过、害羞、思考、平静。示例：我想你啦~<emotion>开心</emotion>",
         "history_message_limit": 40,
         "history_char_limit": 24000,
         "providers": {
-            "openai-main": {
-                "name": "OpenAI Compatible",
-                "base_url": "https://api.openai.com",
+            "xiaolingdang": {
+                "name": "小铃铛云端",
+                "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
                 "chat_path": "/v1/chat/completions",
-                "model": "gpt-4o-mini",
-                "api_key_ref": "provider/openai-main",
+                "model": "qwen3.8-27b",
+                "api_key_ref": "provider/xiaolingdang",
                 "api_key": "",
                 "timeout": 60.0,
-                "temperature": 0.7,
-                "max_tokens": 2048,
+                "temperature": 0.85,
+                "max_tokens": 400,
+                "verify_ssl": True,
             }
         },
     }
@@ -136,6 +156,8 @@ class Config:
             "self_talk_texts": list(DEFAULT_SELF_TALK_TEXTS),
             "mouse_through": False,
             "drag_physics": False,
+            "tts": dict(DEFAULT_TTS),
+            "emotion_anims": dict(DEFAULT_EMOTION_ANIMS),
             "chat": _default_chat_data(),
         }
         self._load()
@@ -195,6 +217,11 @@ class Config:
         ):
             if key in raw and raw[key] is not None:
                 self.data[key] = raw[key]
+        # tts / emotion_anims 是字典，合并而不是覆盖
+        if isinstance(raw.get("tts"), dict):
+            self.data["tts"].update(raw["tts"])
+        if isinstance(raw.get("emotion_anims"), dict):
+            self.data["emotion_anims"].update(raw["emotion_anims"])
         self.data["version"] = 3
 
     def _normalize_pet_settings(self):

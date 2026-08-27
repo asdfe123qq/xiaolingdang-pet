@@ -339,6 +339,10 @@ def build_categories(names, manifest: dict | None = None, folder_map: dict | Non
 
     if folder_files is not None or folder_map:
         idles = list(by_folder.get(DIR_IDLE, []))
+        # 扩展待机池：把轻松动作也纳入待机，让待机动作更丰富
+        for _n in ('悠闲哼歌', '摇扇纳凉', '轻快记录', '照镜子', '小幅度原地 360 度旋转展示'):
+            if _n in names and _n not in idles:
+                idles.append(_n)
         turns = list(by_folder.get(DIR_TURN, []))
         legacy_idle_turn = by_folder.get(DIR_IDLE_TURN, [])
 

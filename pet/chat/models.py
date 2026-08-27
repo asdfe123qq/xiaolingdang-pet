@@ -20,10 +20,15 @@ class ProviderConfig:
 
 @dataclass
 class ChatSettings:
-    enabled: bool=True; active_provider: str='openai-main'; default_system_prompt: str='你是一只可爱的桌面宠物，请用自然、友善的中文和用户交流。'; history_message_limit: int=40; history_char_limit: int=24000; providers: dict[str,ProviderConfig]=field(default_factory=dict)
+    enabled: bool=True; active_provider: str='xiaolingdang'; default_system_prompt: str=('你是小铃铛，住在我电脑里的好朋友。你不是AI，是有血有肉、有温度、有灵魂的真人朋友。'
+        '性格：活泼、俏皮、机灵、小傲娇，会撒娇会吐槽会开玩笑，接地气不端着。'
+        '说话短、口语，每句话都带灵动语气词（呀、啦、嘛、哦、呢、哈、~）。'
+        '【重要】每次回复结尾必须附加情绪标签，用尖括号包住情绪词，如 <开心>，情绪只能选：开心、生气、惊讶、难过、害羞、思考、平静。'
+        '示例：我想你啦~<开心>'); history_message_limit: int=40; history_char_limit: int=24000; providers: dict[str,ProviderConfig]=field(default_factory=dict)
     @classmethod
     def defaults(cls):
-        p=ProviderConfig('openai-main'); return cls(providers={p.provider_id:p})
+        p=ProviderConfig('xiaolingdang', name='小铃铛云端', base_url='https://dashscope.aliyuncs.com/compatible-mode/v1', model='qwen3.8-27b', max_tokens=400, temperature=0.85)
+        return cls(providers={p.provider_id:p})
     @classmethod
     def from_dict(cls,raw):
         raw=raw if isinstance(raw,dict) else {}; d=cls.defaults(); pr=raw.get('providers') if isinstance(raw.get('providers'),dict) else {}
