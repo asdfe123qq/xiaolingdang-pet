@@ -51,7 +51,13 @@ class SpeechPlayer(QObject):
 
     def __init__(self, cache_dir=None, tts=None, parent=None):
         super().__init__(parent)
-        self.cache_dir = Path(cache_dir) if cache_dir else (Path(tempfile.gettempdir()) / "dsh-pet-tts")
+        if cache_dir:
+            self.cache_dir = Path(cache_dir)
+        else:
+            # 持久化到用户数据目录，重启后常用语音不用重新合成
+            import os
+            base = Path(os.environ.get("APPDATA", Path.home()))
+            self.cache_dir = base / "dsh-pet-standalone" / "tts_cache"
         try:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
         except Exception:

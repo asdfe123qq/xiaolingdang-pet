@@ -347,7 +347,6 @@ class PetWindow(QWidget):
     # ================================================================ 播放
     def _switch(self, name: str) -> None:
         """切换到指定动画（链式模型：全部一次性播放）。"""
-        print(f"[pet-debug] _switch -> {name!r}", flush=True)
         self._cancel_move()
         self.anim = name
         movie = self.lib.movie(name)
@@ -462,7 +461,6 @@ class PetWindow(QWidget):
 
     # ================================================================ 动画链
     def _on_anim_ended(self, name: str) -> None:
-        print(f"[pet-debug] _on_anim_ended name={name!r} talking={self._talking}", flush=True)
         if self._talking:
             # 说话中：循环当前动画（情绪表情持续到语音结束）
             self._switch(self.anim)
@@ -850,7 +848,6 @@ class PetWindow(QWidget):
         self._schedule_self_talk()
 
     def set_chat_status(self, state: str, text: str = '') -> None:
-        print(f"[pet-debug] set_chat_status state={state!r} text={text[:50]!r}", flush=True)
         if not text:
             return
         # 去掉情绪标签再显示气泡，避免把 <情绪> 显示给用户看
@@ -876,7 +873,6 @@ class PetWindow(QWidget):
                 '思考': '深度思考碎碎念',
                 '平静': '待机呼吸休闲',
             }.get(emotion)
-            print(f"[pet-debug] 情绪={emotion} 动画={anim}", flush=True)
             self._play_chat_anim(anim)
 
     def _extract_emotion(self, text: str) -> str:
@@ -904,19 +900,17 @@ class PetWindow(QWidget):
             return
         try:
             self._switch(name)
-        except Exception as exc:
-            print(f"[pet-debug] _switch 失败 name={name!r}: {exc}", flush=True)
+        except Exception:
+            pass
 
     def start_talking(self) -> None:
         """开始说话：保持情绪表情循环；若当前是待机(无情绪)则切碎碎念兜底。"""
-        print("[pet-debug] start_talking 被调用", flush=True)
         self._talking = True
         if self.anim in self.idles:
             self._play_chat_anim('深度思考碎碎念')
 
     def stop_talking(self) -> None:
         """说话结束，回待机。"""
-        print("[pet-debug] stop_talking 被调用", flush=True)
         self._talking = False
         if self.idles:
             try:
